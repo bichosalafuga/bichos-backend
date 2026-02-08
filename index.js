@@ -1,12 +1,15 @@
 const express = require("express");
 const cors = require("cors");
 
-// --- DATOS FICTICIOS EN MEMORIA ---
+const app = express();
+app.use(cors());
+app.use(express.json());
 
+// --- DATOS FICTICIOS EN MEMORIA ---
 let usuarios = [
-  { id: 1, nombre: "Toreto", babosas: 1000, lechuguines: 0 },
-  { id: 2, nombre: "Sinhuellas", babosas: 1000, lechuguines: 0 }
-  { id: 3, nombre: "Gari", babosas: 1000, lechuguines: 0 }
+  { id: 1, nombre: "Toreto", babosas: 1000, lechuguines: 12 },
+  { id: 2, nombre: "Sinhuellas", babosas: 1000, lechuguines: 7 },
+  { id: 3, nombre: "Gari", babosas: 1000, lechuguines: 3 }
 ];
 
 let carreras = [
@@ -20,33 +23,20 @@ let carreras = [
 
 let apuestas = [];
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-
+// --- RUTAS ---
 app.get("/", (req, res) => {
   res.send("🐌 Backend Bichos a la fuga funcionando");
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("Servidor en puerto", PORT);
-});
-let usuarios = [
-  { id: 1, nombre: "Toreto", lechuguines: 12 },
-  { id: 2, nombre: "Sinhuellas", lechuguines: 7 },
-  { id: 3, nombre: "Gari", lechuguines: 3 }
-];
-
 app.get("/ranking", (req, res) => {
-  app.post("/apostar", (req, res) => {
+  res.json(usuarios.sort((a, b) => b.lechuguines - a.lechuguines));
+});
+
+app.post("/apostar", (req, res) => {
   const { usuarioId, carreraId, opcion, cantidad } = req.body;
 
-  // Validaciones básicas
   const usuario = usuarios.find(u => u.id === usuarioId);
-  if (!usuario) {
-    return res.status(404).json({ error: "Usuario no encontrado" });
-  }
+  if (!usuario) return res.status(404).json({ error: "Usuario no encontrado" });
 
   const carrera = carreras.find(c => c.id === carreraId);
   if (!carrera || carrera.estado !== "abierta") {
@@ -59,7 +49,6 @@ app.get("/ranking", (req, res) => {
 
   // Registrar apuesta
   usuario.babosas -= cantidad;
-
   apuestas.push({
     usuarioId,
     carreraId,
@@ -75,6 +64,9 @@ app.get("/ranking", (req, res) => {
   });
 });
 
-  res.json(usuarios.sort((a, b) => b.lechuguines - a.lechuguines));
+// --- INICIO DEL SERVIDOR ---
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log("Servidor en puerto", PORT);
 });
 
