@@ -4,8 +4,9 @@ const cors = require("cors");
 // --- DATOS FICTICIOS EN MEMORIA ---
 
 let usuarios = [
-  { id: 1, nombre: "Babosín Turbo", babosas: 1000, lechuguines: 0 },
-  { id: 2, nombre: "Caracol Manolo", babosas: 1000, lechuguines: 0 }
+  { id: 1, nombre: "Toreto", babosas: 1000, lechuguines: 0 },
+  { id: 2, nombre: "Sinhuellas", babosas: 1000, lechuguines: 0 }
+  { id: 3, nombre: "Gari", babosas: 1000, lechuguines: 0 }
 ];
 
 let carreras = [
@@ -32,9 +33,9 @@ app.listen(PORT, () => {
   console.log("Servidor en puerto", PORT);
 });
 let usuarios = [
-  { id: 1, nombre: "Babosín Turbo", lechuguines: 12 },
-  { id: 2, nombre: "Caracol Manolo", lechuguines: 7 },
-  { id: 3, nombre: "Limo Express", lechuguines: 3 }
+  { id: 1, nombre: "Toreto", lechuguines: 12 },
+  { id: 2, nombre: "Sinhuellas", lechuguines: 7 },
+  { id: 3, nombre: "Gari", lechuguines: 3 }
 ];
 
 app.get("/ranking", (req, res) => {
