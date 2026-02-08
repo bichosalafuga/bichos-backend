@@ -1,3 +1,4 @@
+// backend.js
 const express = require("express");
 const cors = require("cors");
 
@@ -17,51 +18,80 @@ let carreras = [
     id: 1,
     nombre: "Gran Premio del Charco",
     estado: "abierta", // abierta | cerrada | finalizada
-    participantes: ["Rápido Slim", "Lento pero Seguro", "Turbo Baba"]
+    participantes: ["Rápido Slim", "Lento pero Seguro", "Turbo Baba"],
+    ganador: null
   }
 ];
 
 let apuestas = [];
 
-// --- RUTAS ---
+// --- RUTAS PÚBLICAS ---
 app.get("/", (req, res) => {
   res.send("🐌 Backend Bichos a la fuga funcionando");
 });
 
+// Ranking de usuarios
 app.get("/ranking", (req, res) => {
   res.json(usuarios.sort((a, b) => b.lechuguines - a.lechuguines));
 });
 
+// Historial de apuestas
+app.get("/apuestas", (req, res) => {
+  res.json(apuestas);
+});
+
+// Apostar a una carrera
 app.post("/apostar", (req, res) => {
   const { usuarioId, carreraId, opcion, cantidad } = req.body;
 
   const usuario = usuarios.find(u => u.id === usuarioId);
-  if (!usuario) return res.status(404).json({ error: "Usuario no encontrado" });
-
   const carrera = carreras.find(c => c.id === carreraId);
-  if (!carrera || carrera.estado !== "abierta") {
+
+  if (!usuario) return res.status(404).json({ error: "Usuario no encontrado" });
+  if (!carrera || carrera.estado !== "abierta")
     return res.status(400).json({ error: "Carrera no disponible para apuestas" });
-  }
+  if (cantidad <= 0 || usuario.babosas < cantidad)
+    return res.status(400).json({ error: "Saldo insuficiente" });
 
-  if (cantidad <= 0 || usuario.babosas < cantidad) {
-    return res.status(400).json({ error: "Saldo ficticio insuficiente" });
-  }
-
-  // Registrar apuesta
   usuario.babosas -= cantidad;
-  apuestas.push({
-    usuarioId,
-    carreraId,
-    opcion,
-    cantidad,
-    fecha: new Date()
-  });
+  apuestas.push({ usuarioId, carreraId, opcion, cantidad, fecha: new Date() });
 
-  res.json({
-    mensaje: "Apuesta ficticia registrada 🐌",
-    aviso: "Sin valor económico",
-    babosasRestantes: usuario.babosas
-  });
+  res.json({ mensaje: "Apuesta registrada 🐌", babosasRestantes: usuario.babosas });
+});
+
+// --- RUTAS ADMIN ---
+// Iniciar carrera (cerrar apuestas)
+app.post("/admin/carrera/iniciar", (req, res) => {
+  const { carreraId } = req.body;
+  const carrera = carreras.find(c => c.id === carreraId);
+
+  if (!carrera) return res.status(404).json({ error: "Carrera no encontrada" });
+  if (carrera.estado !== "abierta") return res.status(400).json({ error: "Carrera no se puede iniciar" });
+
+  carrera.estado = "cerrada";
+  res.json({ mensaje: `Carrera '${carrera.nombre}' iniciada. Apuestas cerradas 🐌` });
+});
+
+// Finalizar carrera y repartir premios
+app.post("/admin/carrera/finalizar", (req, res) => {
+  const { carreraId, ganador } = req.body;
+  const carrera = carreras.find(c => c.id === carreraId);
+
+  if (!carrera) return res.status(404).json({ error: "Carrera no encontrada" });
+  if (carrera.estado !== "cerrada") return res.status(400).json({ error: "Carrera no está en curso" });
+
+  carrera.estado = "finalizada";
+  carrera.ganador = ganador;
+
+  // Repartir premios (doble de la apuesta)
+  apuestas
+    .filter(a => a.carreraId === carreraId && a.opcion === ganador)
+    .forEach(a => {
+      const usuario = usuarios.find(u => u.id === a.usuarioId);
+      usuario.lechuguines += a.cantidad * 2;
+    });
+
+  res.json({ mensaje: `Carrera finalizada 🏁. Ganador: ${ganador}`, carrera });
 });
 
 // --- INICIO DEL SERVIDOR ---
@@ -69,4 +99,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("Servidor en puerto", PORT);
 });
+
 
