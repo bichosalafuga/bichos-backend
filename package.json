@@ -1,7 +1,7 @@
 {
   "name": "bichos-backend",
   "version": "1.0.0",
-  "description": "Backend ficticio sin dinero real",
+  "description": "Backend ficticio sin dinero real para Bichos a la fuga",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -11,8 +11,6 @@
   },
   "dependencies": {
     "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "body-parser": "^1.20.2"
+    "cors": "^2.8.5"
   }
 }
-
