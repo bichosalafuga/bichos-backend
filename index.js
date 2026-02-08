@@ -25,7 +25,13 @@
   <fieldset>
     <legend>Apostar</legend>
     <form id="apuestaForm">
-      <label>Usuario ID: <input type="number" name="usuarioId" required></label>
+<label>Usuario:
+  <select name="usuarioId" required>
+    <option value="1">Toreto</option>
+    <option value="2">Sinhuellas</option>
+    <option value="3">Gari</option>
+  </select>
+</label>
       <label>Carrera ID: <input type="number" name="carreraId" value="1" required></label>
       <label>Tipo de apuesta:
         <select name="tipo" id="tipoApuesta" required>
