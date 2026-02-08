@@ -1,4 +1,4 @@
-// index.js (Node.js backend)
+// index.js (Node.js backend definitivo)
 const express = require('express');
 const cors = require('cors');
 
@@ -12,13 +12,14 @@ let ranking = [0,0,0]; // lechuguines por jugador
 const apuestas = []; // todas las apuestas
 const babosasCarreras = Array(8).fill(100); // 8 carreras
 
-// Resultados de las carreras (simulado, se actualizará al procesar)
+// Resultados de las carreras (simulado, actualizar al procesar)
 const resultadosCarreras = [
   {posicion:["Toreto","Sinhuellas","Tro Gari","Arrastrado","Baboso Flash"], primer_movimiento:"Sinhuellas", primer_salida:"Toreto", tiempo:"10-20", cuantos_llegan:5},
   {}, {}, {}, {}, {}, {}, {}
 ];
 
 // --- Rutas ---
+// Ruta de prueba
 app.get('/', (req,res) => {
   res.send('Backend de Bichos funcionando!');
 });
@@ -31,9 +32,15 @@ app.post('/apuesta', (req,res)=>{
   if(indiceJugador === -1) return res.status(400).json({error:"Usuario no válido"});
 
   const carreraIdx = carrera - 1;
-  if(cantidad > babosasCarreras[carreraIdx]) return res.status(400).json({error:`No quedan suficientes babosas. Restan: ${babosasCarreras[carreraIdx]}`});
+  if(carreraIdx < 0 || carreraIdx >= babosasCarreras.length){
+    return res.status(400).json({error:"Carrera inválida"});
+  }
 
-  // Restar babosas
+  if(cantidad > babosasCarreras[carreraIdx]){
+    return res.status(400).json({error:`No quedan suficientes babosas. Restan: ${babosasCarreras[carreraIdx]}`});
+  }
+
+  // Restar babosas de la carrera
   babosasCarreras[carreraIdx] -= cantidad;
 
   // Guardar apuesta
@@ -52,9 +59,27 @@ app.get('/ranking', (req,res)=>{
   res.json(copia);
 });
 
-// Obtener todas las apuestas
+// Obtener todas las apuestas activas
 app.get('/apuestas', (req,res)=>{
   res.json(apuestas);
+});
+
+// Editar una apuesta por índice
+app.put('/apuesta/:indice', (req,res)=>{
+  const idx = parseInt(req.params.indice);
+  if(isNaN(idx) || idx<0 || idx>=apuestas.length) return res.status(400).json({error:"Índice inválido"});
+
+  apuestas[idx] = { ...apuestas[idx], ...req.body };
+  res.json({ mensaje: "Apuesta actualizada", apuesta: apuestas[idx] });
+});
+
+// Borrar una apuesta por índice
+app.delete('/apuesta/:indice', (req,res)=>{
+  const idx = parseInt(req.params.indice);
+  if(isNaN(idx) || idx<0 || idx>=apuestas.length) return res.status(400).json({error:"Índice inválido"});
+
+  const eliminada = apuestas.splice(idx,1);
+  res.json({ mensaje: "Apuesta eliminada", eliminada });
 });
 
 // Procesar carrera: actualizar ranking según resultados
@@ -63,7 +88,9 @@ app.post("/procesar-carrera", (req,res)=>{
   const idxCarrera = carrera-1;
   const resultado = resultadosCarreras[idxCarrera];
 
-  if(!resultado || Object.keys(resultado).length===0) return res.status(400).json({error:"Carrera no definida o sin resultados"});
+  if(!resultado || Object.keys(resultado).length===0){
+    return res.status(400).json({error:"Carrera no definida o sin resultados"});
+  }
 
   apuestas.forEach(a=>{
     if(a.carrera == carrera){
@@ -83,6 +110,10 @@ app.post("/procesar-carrera", (req,res)=>{
 
   res.json({ mensaje:"Carrera procesada", ranking });
 });
+
+// Iniciar servidor
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, ()=>console.log(`Servidor escuchando en puerto ${PORT}`));
 
 // Puerto
 const PORT = process.env.PORT || 3000;
