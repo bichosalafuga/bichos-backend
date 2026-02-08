@@ -18,12 +18,15 @@ let carreras = [
     id: 1,
     nombre: "Gran Premio del Charco",
     estado: "abierta",
-    participantes: ["Rápido Slim", "Lento pero Seguro", "Turbo Baba"],
+    participantes: [
+      { nombre: "Rápido Slim", tiempoLlegada: null, seMovioPrimero: false, seSalio: false },
+      { nombre: "Lento pero Seguro", tiempoLlegada: null, seMovioPrimero: false, seSalio: false },
+      { nombre: "Turbo Baba", tiempoLlegada: null, seMovioPrimero: false, seSalio: false }
+    ],
+    apuestas: [],
     ganador: null
   }
 ];
-
-let apuestas = [];
 
 // --- ENDPOINTS ---
 app.get("/", (req, res) => res.send("🐌 Backend Bichos funcionando"));
@@ -34,11 +37,11 @@ app.get("/ranking", (req, res) => {
 });
 
 // Historial de apuestas
-app.get("/apuestas", (req, res) => res.json(apuestas));
+app.get("/apuestas", (req, res) => res.json(carreras.flatMap(c => c.apuestas)));
 
 // Apostar
 app.post("/apostar", (req, res) => {
-  const { usuarioId, carreraId, opcion, cantidad } = req.body;
+  const { usuarioId, carreraId, tipo, objetivo, cantidad } = req.body;
   const usuario = usuarios.find(u => u.id === usuarioId);
   const carrera = carreras.find(c => c.id === carreraId);
 
@@ -47,16 +50,17 @@ app.post("/apostar", (req, res) => {
   if (cantidad <= 0 || usuario.babosas < cantidad) return res.status(400).json({ error: "Saldo insuficiente" });
 
   usuario.babosas -= cantidad;
-  apuestas.push({ usuarioId, carreraId, opcion, cantidad, fecha: new Date() });
+  const apuesta = { usuarioId, tipo, objetivo, cantidad, fecha: new Date() };
+  carrera.apuestas.push(apuesta);
 
   res.json({ mensaje: "Apuesta registrada 🐌", babosasRestantes: usuario.babosas });
 });
 
 // --- ADMIN ---
+// Iniciar carrera
 app.post("/admin/carrera/iniciar", (req, res) => {
   const { carreraId } = req.body;
   const carrera = carreras.find(c => c.id === carreraId);
-
   if (!carrera) return res.status(404).json({ error: "Carrera no encontrada" });
   if (carrera.estado !== "abierta") return res.status(400).json({ error: "Carrera no se puede iniciar" });
 
@@ -64,28 +68,54 @@ app.post("/admin/carrera/iniciar", (req, res) => {
   res.json({ mensaje: `Carrera '${carrera.nombre}' iniciada. Apuestas cerradas 🐌` });
 });
 
+// Finalizar carrera y calcular premios
 app.post("/admin/carrera/finalizar", (req, res) => {
-  const { carreraId, ganador } = req.body;
+  const { carreraId, resultados } = req.body;
+  // resultados = [{nombre:"Rápido Slim", tiempoLlegada:5, seMovioPrimero:true, seSalio:false}, ...]
   const carrera = carreras.find(c => c.id === carreraId);
-
   if (!carrera) return res.status(404).json({ error: "Carrera no encontrada" });
   if (carrera.estado !== "cerrada") return res.status(400).json({ error: "Carrera no está en curso" });
 
+  // Actualizar participantes con resultados
+  carrera.participantes.forEach(p => {
+    const r = resultados.find(r => r.nombre === p.nombre);
+    if (r) Object.assign(p, r);
+  });
   carrera.estado = "finalizada";
-  carrera.ganador = ganador;
 
-  apuestas
-    .filter(a => a.carreraId === carreraId && a.opcion === ganador)
-    .forEach(a => {
-      const usuario = usuarios.find(u => u.id === a.usuarioId);
-      usuario.lechuguines += a.cantidad * 2;
-    });
+  // Determinar ganador = quien tiene menor tiempoLlegada
+  const orden = carrera.participantes.slice().sort((a,b)=>a.tiempoLlegada - b.tiempoLlegada);
+  carrera.ganador = orden[0].nombre;
 
-  res.json({ mensaje: `Carrera finalizada 🏁. Ganador: ${ganador}`, carrera });
+  // Repartir premios según apuestas
+  carrera.apuestas.forEach(a => {
+    const usuario = usuarios.find(u => u.id === a.usuarioId);
+    let premio = 0;
+
+    if (a.tipo === "posicion") {
+      const pos = orden.indexOf(orden.find(p => p.nombre === a.objetivo)) + 1;
+      if (pos === a.objetivo) premio = a.cantidad * 2;
+    }
+    else if (a.tipo === "primer_movimiento") {
+      const primero = orden.find(p => p.seMovioPrimero);
+      if (primero.nombre === a.objetivo) premio = a.cantidad * 1.5;
+    }
+    else if (a.tipo === "primer_salida") {
+      const salio = orden.find(p => p.seSalio);
+      if (salio && salio.nombre === a.objetivo) premio = a.cantidad * 1.5;
+    }
+    else if (a.tipo === "tiempo") {
+      const participante = orden.find(p => p.nombre === a.objetivo.nombre);
+      if (participante && participante.tiempoLlegada <= a.objetivo.tiempoMax) premio = a.cantidad * 2;
+    }
+
+    usuario.lechuguines += premio;
+  });
+
+  res.json({ mensaje: "Carrera finalizada 🏁", carrera });
 });
 
 // --- SERVIDOR ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("Servidor en puerto", PORT));
-
 
