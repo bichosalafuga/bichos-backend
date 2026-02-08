@@ -25,13 +25,14 @@
   <fieldset>
     <legend>Apostar</legend>
     <form id="apuestaForm">
-<label>Usuario:
-  <select name="usuarioId" required>
-    <option value="1">Toreto</option>
-    <option value="2">Sinhuellas</option>
-    <option value="3">Gari</option>
-  </select>
-</label>
+      <label>Usuario:
+        <select name="usuarioId" required>
+          <option value="1">Jugador 1</option>
+          <option value="2">Jugador 2</option>
+          <option value="3">Jugador 3</option>
+        </select>
+      </label>
+
       <label>Carrera ID: <input type="number" name="carreraId" value="1" required></label>
       <label>Tipo de apuesta:
         <select name="tipo" id="tipoApuesta" required>
@@ -39,6 +40,7 @@
           <option value="primer_movimiento">Primer en moverse</option>
           <option value="primer_salida">Primer en salirse</option>
           <option value="tiempo">Tiempo de llegada</option>
+          <option value="cuantos_llegan">Cuántos llegan</option>
         </select>
       </label>
 
@@ -89,21 +91,33 @@ let participantes = [
   { nombre: "Sinhuellas", descripcion: "No deja rastro" },
   { nombre: "Tro Gari", descripcion: "Ojo loco" },
   { nombre: "Arrastrado", descripcion: "Lento pero constante" },
-  { nombre: "Baboso Flash", descripcion: "Rápido y resbaladizo" },
-  { nombre: "Caracolín", descripcion: "Lento pero estratégico" }
+  { nombre: "Baboso Flash", descripcion: "Rápido y resbaladizo" }
 ];
+
+const carrerasNombres = [
+  "Escalada Pegada",
+  "Gran Desliz",
+  "Baba Rápida",
+  "Trofeo Lento",
+  "Flash Final",
+  "Maratón Babosa",
+  "Carrera Sin Huella",
+  "Desafío Arrastrado"
+];
+
+let lechuguines = 0;
 
 const objetivoContainer = document.getElementById("objetivoContainer");
 const tipoApuesta = document.getElementById("tipoApuesta");
 
-// Función para actualizar los inputs según tipo de apuesta
+// Función para actualizar inputs según tipo de apuesta
 function actualizarObjetivoInput() {
   const tipo = tipoApuesta.value;
   objetivoContainer.innerHTML = "";
 
-  if (tipo === "posicion") {
+  if(tipo === "posicion") {
     const label = document.createElement("label");
-    label.textContent = "Selecciona caracol y posición:";
+    label.textContent = "Selecciona 1º, 2º o 3º lugar:";
     const selectCaracol = document.createElement("select");
     selectCaracol.name = "caracol";
     participantes.forEach(p => {
@@ -114,7 +128,7 @@ function actualizarObjetivoInput() {
     });
     const selectPos = document.createElement("select");
     selectPos.name = "posicion";
-    [1,2,3,4,5].forEach(n => {
+    [1,2,3].forEach(n => {
       const option = document.createElement("option");
       option.value = n;
       option.textContent = n;
@@ -124,7 +138,7 @@ function actualizarObjetivoInput() {
     label.appendChild(selectPos);
     objetivoContainer.appendChild(label);
   }
-  else if (tipo === "primer_movimiento" || tipo === "primer_salida") {
+  else if(tipo === "primer_movimiento" || tipo === "primer_salida") {
     const label = document.createElement("label");
     label.textContent = "Selecciona caracol:";
     const select = document.createElement("select");
@@ -138,25 +152,36 @@ function actualizarObjetivoInput() {
     label.appendChild(select);
     objetivoContainer.appendChild(label);
   }
-  else if (tipo === "tiempo") {
+  else if(tipo === "tiempo") {
     const label = document.createElement("label");
-    label.textContent = "Caracol y tiempo máximo (minutos, hasta 30):";
-    const inputNombre = document.createElement("input");
-    inputNombre.name = "nombre";
-    inputNombre.placeholder = "Nombre del caracol";
-    const inputTiempo = document.createElement("input");
-    inputTiempo.name = "tiempoMax";
-    inputTiempo.type = "number";
-    inputTiempo.min = 1;
-    inputTiempo.max = 30;
-    inputTiempo.placeholder = "Tiempo máximo";
-    label.appendChild(inputNombre);
-    label.appendChild(inputTiempo);
+    label.textContent = "Selecciona rango de tiempo:";
+    const selectTiempo = document.createElement("select");
+    selectTiempo.name = "tiempo";
+    ["0-10","10-20","20-30"].forEach(r => {
+      const option = document.createElement("option");
+      option.value = r;
+      option.textContent = r;
+      selectTiempo.appendChild(option);
+    });
+    label.appendChild(selectTiempo);
+    objetivoContainer.appendChild(label);
+  }
+  else if(tipo === "cuantos_llegan") {
+    const label = document.createElement("label");
+    label.textContent = "Selecciona cuántos llegan:";
+    const select = document.createElement("select");
+    select.name = "cantidadLlegan";
+    [1,2,3,4,5].forEach(n => {
+      const option = document.createElement("option");
+      option.value = n;
+      option.textContent = n;
+      select.appendChild(option);
+    });
+    label.appendChild(select);
     objetivoContainer.appendChild(label);
   }
 }
 
-// Inicializar formulario
 actualizarObjetivoInput();
 tipoApuesta.addEventListener("change", actualizarObjetivoInput);
 
@@ -167,12 +192,17 @@ document.getElementById("apuestaForm").addEventListener("submit", async (e) => {
   const tipo = form.tipo.value;
   let objetivo;
 
-  if (tipo === "posicion") {
+  if(tipo === "posicion") {
     objetivo = { nombre: form.caracol.value, posicion: parseInt(form.posicion.value) };
-  } else if (tipo === "primer_movimiento" || tipo === "primer_salida") {
+  }
+  else if(tipo === "primer_movimiento" || tipo === "primer_salida") {
     objetivo = form.caracol.value;
-  } else if (tipo === "tiempo") {
-    objetivo = { nombre: form.nombre.value, tiempoMax: parseInt(form.tiempoMax.value) };
+  }
+  else if(tipo === "tiempo") {
+    objetivo = form.tiempo.value;
+  }
+  else if(tipo === "cuantos_llegan") {
+    objetivo = parseInt(form.cantidadLlegan.value);
   }
 
   const data = {
@@ -183,55 +213,40 @@ document.getElementById("apuestaForm").addEventListener("submit", async (e) => {
     cantidad: parseInt(form.cantidad.value)
   };
 
-  const res = await fetch(`${API}/apostar`, {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(data)
-  });
-  const json = await res.json();
-  document.getElementById("apuestaResult").innerText = JSON.stringify(json, null, 2);
+  // Aquí se haría fetch a backend
+  // Simulación de cálculo de lechuguines
+  let ganancia = 100; // Babosas base
+  if(tipo === "posicion") ganancia *= 2;
+  else ganancia *= 3; // Triplica para otros tipos
+
+  lechuguines += ganancia;
+
+  document.getElementById("apuestaResult").innerText = `
+    Apuesta enviada:\n${JSON.stringify(data,null,2)}
+    \nGanancia simulada: ${ganancia} lechuguines
+    \nTotal acumulado: ${lechuguines} lechuguines
+  `;
 });
 
-// PANEL ADMIN
-document.getElementById("iniciarCarrera").addEventListener("click", async () => {
+// PANEL ADMIN (simulado)
+document.getElementById("iniciarCarrera").addEventListener("click", () => {
   const carreraId = parseInt(document.getElementById("adminCarreraId").value);
-  const res = await fetch(`${API}/admin/carrera/iniciar`, {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ carreraId })
-  });
-  document.getElementById("adminResult").innerText = JSON.stringify(await res.json(), null, 2);
+  alert(`Carrera ${carrerasNombres[carreraId-1] || "Desconocida"} iniciada`);
 });
 
-document.getElementById("finalizarCarrera").addEventListener("click", async () => {
+document.getElementById("finalizarCarrera").addEventListener("click", () => {
   const carreraId = parseInt(document.getElementById("adminCarreraId").value);
-  const resultadosText = document.getElementById("adminResultados").value;
-  let resultados;
-  try { resultados = JSON.parse(resultadosText); } 
-  catch(e) { alert("JSON inválido"); return; }
-
-  const res = await fetch(`${API}/admin/carrera/finalizar`, {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ carreraId, resultados })
-  });
-  document.getElementById("adminResult").innerText = JSON.stringify(await res.json(), null, 2);
+  alert(`Carrera ${carrerasNombres[carreraId-1] || "Desconocida"} finalizada`);
 });
 
-// RANKING
-document.getElementById("refreshRanking").addEventListener("click", async () => {
-  const res = await fetch(`${API}/ranking`);
-  document.getElementById("ranking").innerText = JSON.stringify(await res.json(), null, 2);
+// Ranking e historial simulados
+document.getElementById("refreshRanking").addEventListener("click", () => {
+  document.getElementById("ranking").innerText = `Lechuguines acumulados: ${lechuguines}`;
 });
-
-// HISTORIAL DE APUESTAS
-document.getElementById("refreshApuestas").addEventListener("click", async () => {
-  const res = await fetch(`${API}/apuestas`);
-  document.getElementById("historial").innerText = JSON.stringify(await res.json(), null, 2);
+document.getElementById("refreshApuestas").addEventListener("click", () => {
+  document.getElementById("historial").innerText = `Simulación de apuestas realizadas. Total lechuguines: ${lechuguines}`;
 });
 </script>
 
 </body>
 </html>
-
-
