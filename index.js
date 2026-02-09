@@ -1,121 +1,95 @@
-// index.js (Node.js backend definitivo)
-const express = require('express');
-const cors = require('cors');
+const express = require("express");
+const cors = require("cors");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- Configuración inicial ---
+// ================= DATOS =================
 const jugadores = ["Junma01","Jony67","Jorge07"];
-let ranking = [0,0,0]; // lechuguines por jugador
-const apuestas = []; // todas las apuestas
-const babosasCarreras = Array(8).fill(100); // 8 carreras
+let ranking = {
+  Junma01: 0,
+  Jony67: 0,
+  Jorge07: 0
+};
 
-// Resultados de las carreras (simulado, actualizar al procesar)
-const resultadosCarreras = [
-  {posicion:["Toreto","Sinhuellas","Tro Gari","Arrastrado","Baboso Flash"], primer_movimiento:"Sinhuellas", primer_salida:"Toreto", tiempo:"10-20", cuantos_llegan:5},
-  {}, {}, {}, {}, {}, {}, {}
-];
+let apuestas = [];
+let carrerasFinalizadas = [];
+const babosasCarreras = Array(8).fill(100);
+let resultadosCarreras = {};
 
-// --- Rutas ---
-// Ruta de prueba
-app.get('/', (req,res) => {
-  res.send('Backend de Bichos funcionando!');
+// ================= RUTAS =================
+app.get("/", (req,res)=>{
+  res.send("🐌 Backend Bichos a la fuga funcionando");
 });
 
 // Registrar apuesta
-app.post('/apuesta', (req,res)=>{
+app.post("/apuesta",(req,res)=>{
   const { usuario, carrera, tipo, objetivo, cantidad } = req.body;
 
-  const indiceJugador = jugadores.indexOf(usuario);
-  if(indiceJugador === -1) return res.status(400).json({error:"Usuario no válido"});
+  if(!jugadores.includes(usuario))
+    return res.status(400).json({error:"Usuario no válido"});
 
-  const carreraIdx = carrera - 1;
-  if(carreraIdx < 0 || carreraIdx >= babosasCarreras.length){
-    return res.status(400).json({error:"Carrera inválida"});
-  }
+  if(carrerasFinalizadas.includes(carrera))
+    return res.status(400).json({error:"Carrera finalizada"});
 
-  if(cantidad > babosasCarreras[carreraIdx]){
-    return res.status(400).json({error:`No quedan suficientes babosas. Restan: ${babosasCarreras[carreraIdx]}`});
-  }
+  if(cantidad > babosasCarreras[carrera-1])
+    return res.status(400).json({error:"No quedan babosas"});
 
-  // Restar babosas de la carrera
-  babosasCarreras[carreraIdx] -= cantidad;
-
-  // Guardar apuesta
+  babosasCarreras[carrera-1] -= cantidad;
   apuestas.push({ usuario, carrera, tipo, objetivo, cantidad });
 
-  res.json({
-    mensaje: "Apuesta registrada",
-    babosasRestantes: babosasCarreras[carreraIdx]
-  });
+  res.json({mensaje:"Apuesta registrada"});
 });
 
-// Obtener ranking ordenado
-app.get('/ranking', (req,res)=>{
-  const copia = ranking.map((lech,i)=>({nombre:jugadores[i], lech}));
-  copia.sort((a,b)=>b.lech - a.lech);
-  res.json(copia);
+// Ver apuestas
+app.get("/apuestas",(req,res)=>res.json(apuestas));
+
+// Ranking
+app.get("/ranking",(req,res)=>{
+  const data = Object.entries(ranking)
+    .map(([nombre,lech])=>({nombre,lech}))
+    .sort((a,b)=>b.lech-a.lech);
+  res.json(data);
 });
 
-// Obtener todas las apuestas activas
-app.get('/apuestas', (req,res)=>{
-  res.json(apuestas);
+// Carreras finalizadas
+app.get("/carreras-finalizadas",(req,res)=>{
+  res.json(carrerasFinalizadas);
 });
 
-// Editar una apuesta por índice
-app.put('/apuesta/:indice', (req,res)=>{
-  const idx = parseInt(req.params.indice);
-  if(isNaN(idx) || idx<0 || idx>=apuestas.length) return res.status(400).json({error:"Índice inválido"});
+// ADMIN: procesar resultados
+app.post("/admin/resultado",(req,res)=>{
+  const { carrera, resultado } = req.body;
 
-  apuestas[idx] = { ...apuestas[idx], ...req.body };
-  res.json({ mensaje: "Apuesta actualizada", apuesta: apuestas[idx] });
-});
+  if(carrerasFinalizadas.includes(carrera))
+    return res.status(400).json({error:"Carrera ya procesada"});
 
-// Borrar una apuesta por índice
-app.delete('/apuesta/:indice', (req,res)=>{
-  const idx = parseInt(req.params.indice);
-  if(isNaN(idx) || idx<0 || idx>=apuestas.length) return res.status(400).json({error:"Índice inválido"});
-
-  const eliminada = apuestas.splice(idx,1);
-  res.json({ mensaje: "Apuesta eliminada", eliminada });
-});
-
-// Procesar carrera: actualizar ranking según resultados
-app.post("/procesar-carrera", (req,res)=>{
-  const { carrera } = req.body;
-  const idxCarrera = carrera-1;
-  const resultado = resultadosCarreras[idxCarrera];
-
-  if(!resultado || Object.keys(resultado).length===0){
-    return res.status(400).json({error:"Carrera no definida o sin resultados"});
-  }
+  resultadosCarreras[carrera] = resultado;
+  carrerasFinalizadas.push(carrera);
 
   apuestas.forEach(a=>{
-    if(a.carrera == carrera){
-      let acierto=false;
-      if(a.tipo==="posicion") acierto = resultado.posicion[a.objetivo.posicion-1] === a.objetivo.nombre;
-      else if(a.tipo==="primer_movimiento") acierto = resultado.primer_movimiento === a.objetivo;
-      else if(a.tipo==="primer_salida") acierto = resultado.primer_salida === a.objetivo;
-      else if(a.tipo==="tiempo") acierto = resultado.tiempo === a.objetivo;
-      else if(a.tipo==="cuantos_llegan") acierto = resultado.cuantos_llegan === a.objetivo;
+    if(a.carrera !== carrera) return;
 
-      if(acierto){
-        const idxJugador = jugadores.indexOf(a.usuario);
-        ranking[idxJugador] += a.cantidad * (a.tipo==="posicion"?2:3);
-      }
-    }
+    let acierto = false;
+    if(a.tipo==="posicion")
+      acierto = resultado.posicion[a.objetivo.posicion-1] === a.objetivo.nombre;
+    if(a.tipo==="primer_movimiento")
+      acierto = resultado.primer_movimiento === a.objetivo;
+    if(a.tipo==="primer_salida")
+      acierto = resultado.primer_salida === a.objetivo;
+    if(a.tipo==="tiempo")
+      acierto = resultado.tiempo === a.objetivo;
+    if(a.tipo==="cuantos_llegan")
+      acierto = resultado.cuantos_llegan === a.objetivo;
+
+    if(acierto)
+      ranking[a.usuario] += a.cantidad * (a.tipo==="posicion"?2:3);
   });
 
-  res.json({ mensaje:"Carrera procesada", ranking });
+  res.json({mensaje:"Carrera procesada", ranking});
 });
 
-// Iniciar servidor
+// ================= START =================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, ()=>console.log(`Servidor escuchando en puerto ${PORT}`));
-
-// Puerto
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, ()=>console.log(`Servidor escuchando en puerto ${PORT}`));
-
+app.listen(PORT, ()=>console.log("Servidor activo en puerto",PORT));
