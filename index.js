@@ -1,95 +1,154 @@
-const express = require("express");
-const cors = require("cors");
+// index.js - Backend completo para Bichos a la fuga
+const express = require('express');
+const cors = require('cors');
+const nodemailer = require('nodemailer');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ================= DATOS =================
+// --- Configuración inicial ---
 const jugadores = ["Junma01","Jony67","Jorge07"];
-let ranking = {
-  Junma01: 0,
-  Jony67: 0,
-  Jorge07: 0
-};
+let ranking = [0,0,0]; // lechuguines por jugador
+const apuestas = []; // todas las apuestas
+const babosasCarreras = Array(8).fill(100); // 8 carreras
 
-let apuestas = [];
-let carrerasFinalizadas = [];
-const babosasCarreras = Array(8).fill(100);
-let resultadosCarreras = {};
+// Resultados de las carreras (simulado, actualizar al procesar)
+const resultadosCarreras = [
+  {posicion:["Toreto","Sinhuellas","Tro Gari","Arrastrado","Baboso Flash"], primer_movimiento:"Sinhuellas", primer_salida:"Toreto", tiempo:"10-20", cuantos_llegan:5},
+  {}, {}, {}, {}, {}, {}, {}
+];
 
-// ================= RUTAS =================
-app.get("/", (req,res)=>{
-  res.send("🐌 Backend Bichos a la fuga funcionando");
+// --- Nodemailer - enviar apuestas por correo ---
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'bichosalafuga@gmail.com',        // tu correo Gmail
+        pass: 'Bichitos_2580'             // contraseña de app
+    }
+});
+
+// --- Rutas ---
+
+// Ruta de prueba
+app.get('/', (req,res) => {
+  res.send('Backend de Bichos funcionando!');
 });
 
 // Registrar apuesta
-app.post("/apuesta",(req,res)=>{
+app.post('/apuesta', (req,res)=>{
   const { usuario, carrera, tipo, objetivo, cantidad } = req.body;
 
-  if(!jugadores.includes(usuario))
-    return res.status(400).json({error:"Usuario no válido"});
+  const indiceJugador = jugadores.indexOf(usuario);
+  if(indiceJugador === -1) return res.status(400).json({error:"Usuario no válido"});
 
-  if(carrerasFinalizadas.includes(carrera))
-    return res.status(400).json({error:"Carrera finalizada"});
+  const carreraIdx = carrera - 1;
+  if(carreraIdx < 0 || carreraIdx >= babosasCarreras.length){
+    return res.status(400).json({error:"Carrera inválida"});
+  }
 
-  if(cantidad > babosasCarreras[carrera-1])
-    return res.status(400).json({error:"No quedan babosas"});
+  if(cantidad > babosasCarreras[carreraIdx]){
+    return res.status(400).json({error:`No quedan suficientes babosas. Restan: ${babosasCarreras[carreraIdx]}`});
+  }
 
-  babosasCarreras[carrera-1] -= cantidad;
+  // Restar babosas de la carrera
+  babosasCarreras[carreraIdx] -= cantidad;
+
+  // Guardar apuesta
   apuestas.push({ usuario, carrera, tipo, objetivo, cantidad });
 
-  res.json({mensaje:"Apuesta registrada"});
+  res.json({
+    mensaje: "Apuesta registrada",
+    babosasRestantes: babosasCarreras[carreraIdx]
+  });
 });
 
-// Ver apuestas
-app.get("/apuestas",(req,res)=>res.json(apuestas));
+// Enviar apuesta por correo
+app.post('/enviar-apuesta', async (req,res)=>{
+  const { usuario, carrera, tipo, objetivo, cantidad } = req.body;
 
-// Ranking
-app.get("/ranking",(req,res)=>{
-  const data = Object.entries(ranking)
-    .map(([nombre,lech])=>({nombre,lech}))
-    .sort((a,b)=>b.lech-a.lech);
-  res.json(data);
+  const mensaje = `
+Nueva apuesta registrada:
+
+Usuario: ${usuario}
+Carrera: ${carrera}
+Tipo de apuesta: ${tipo}
+Objetivo: ${JSON.stringify(objetivo)}
+Cantidad de babosas: ${cantidad}
+  `;
+
+  try{
+    await transporter.sendMail({
+      from: `"Bichos a la fuga" <TU_CORREO@gmail.com>`,
+      to: 'bichosalafuga@gmail.com',
+      subject: 'Nueva apuesta registrada',
+      text: mensaje
+    });
+    res.json({ status: 'ok', mensaje: 'Correo enviado correctamente' });
+  }catch(err){
+    console.error(err);
+    res.status(500).json({ status:'error', message: err.message });
+  }
 });
 
-// Carreras finalizadas
-app.get("/carreras-finalizadas",(req,res)=>{
-  res.json(carrerasFinalizadas);
+// Obtener ranking ordenado
+app.get('/ranking', (req,res)=>{
+  const copia = ranking.map((lech,i)=>({nombre:jugadores[i], lech}));
+  copia.sort((a,b)=>b.lech - a.lech);
+  res.json(copia);
 });
 
-// ADMIN: procesar resultados
-app.post("/admin/resultado",(req,res)=>{
-  const { carrera, resultado } = req.body;
+// Obtener todas las apuestas activas
+app.get('/apuestas', (req,res)=>{
+  res.json(apuestas);
+});
 
-  if(carrerasFinalizadas.includes(carrera))
-    return res.status(400).json({error:"Carrera ya procesada"});
+// Editar una apuesta por índice
+app.put('/apuesta/:indice', (req,res)=>{
+  const idx = parseInt(req.params.indice);
+  if(isNaN(idx) || idx<0 || idx>=apuestas.length) return res.status(400).json({error:"Índice inválido"});
+  apuestas[idx] = { ...apuestas[idx], ...req.body };
+  res.json({ mensaje: "Apuesta actualizada", apuesta: apuestas[idx] });
+});
 
-  resultadosCarreras[carrera] = resultado;
-  carrerasFinalizadas.push(carrera);
+// Borrar una apuesta por índice
+app.delete('/apuesta/:indice', (req,res)=>{
+  const idx = parseInt(req.params.indice);
+  if(isNaN(idx) || idx<0 || idx>=apuestas.length) return res.status(400).json({error:"Índice inválido"});
+  const eliminada = apuestas.splice(idx,1);
+  res.json({ mensaje: "Apuesta eliminada", eliminada });
+});
+
+// Procesar carrera: actualizar ranking según resultados
+app.post("/procesar-carrera", (req,res)=>{
+  const { carrera } = req.body;
+  const idxCarrera = carrera-1;
+  const resultado = resultadosCarreras[idxCarrera];
+
+  if(!resultado || Object.keys(resultado).length===0){
+    return res.status(400).json({error:"Carrera no definida o sin resultados"});
+  }
 
   apuestas.forEach(a=>{
-    if(a.carrera !== carrera) return;
+    if(a.carrera == carrera){
+      let acierto=false;
+      if(a.tipo==="posicion") acierto = resultado.posicion[a.objetivo.posicion-1] === a.objetivo.nombre;
+      else if(a.tipo==="primer_movimiento") acierto = resultado.primer_movimiento === a.objetivo;
+      else if(a.tipo==="primer_salida") acierto = resultado.primer_salida === a.objetivo;
+      else if(a.tipo==="tiempo") acierto = resultado.tiempo === a.objetivo;
+      else if(a.tipo==="cuantos_llegan") acierto = resultado.cuantos_llegan === a.objetivo;
 
-    let acierto = false;
-    if(a.tipo==="posicion")
-      acierto = resultado.posicion[a.objetivo.posicion-1] === a.objetivo.nombre;
-    if(a.tipo==="primer_movimiento")
-      acierto = resultado.primer_movimiento === a.objetivo;
-    if(a.tipo==="primer_salida")
-      acierto = resultado.primer_salida === a.objetivo;
-    if(a.tipo==="tiempo")
-      acierto = resultado.tiempo === a.objetivo;
-    if(a.tipo==="cuantos_llegan")
-      acierto = resultado.cuantos_llegan === a.objetivo;
-
-    if(acierto)
-      ranking[a.usuario] += a.cantidad * (a.tipo==="posicion"?2:3);
+      if(acierto){
+        const idxJugador = jugadores.indexOf(a.usuario);
+        ranking[idxJugador] += a.cantidad * (a.tipo==="posicion"?2:3);
+      }
+    }
   });
 
-  res.json({mensaje:"Carrera procesada", ranking});
+  res.json({ mensaje:"Carrera procesada", ranking });
 });
 
-// ================= START =================
+// Iniciar servidor
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, ()=>console.log("Servidor activo en puerto",PORT));
+app.listen(PORT, ()=>console.log(`Servidor escuchando en puerto ${PORT}`));
+
